@@ -4,7 +4,7 @@ import csv
 S_REG = 3 # レジスタ数
 LENGTH = 259 # 符号長
 LT3 = LENGTH * S_REG 
-TEST = 100 # テスト回数100000
+TEST = 1 # テスト回数100000
 
 # 初期化
 tdata = rdata = np.zeros((TEST, LENGTH), dtype=np.int)
@@ -107,16 +107,9 @@ nodes = [node0, node1, node2, node3, node4, node5, node6, node7]
 
 def awgn(SNRdB, size):
     # awgnを作る
-    
-    #信号エネルギーは1とする
-    E_s = 1
-    
-    #符号化率
-    S_REG
-    R = 1 / S_REG
-    
-    #雑音N_0
-    N_0 = E_s * R * 10 ** (- SNRdB / 10)
+    E_s = 1     #信号エネルギーは1
+    R = S_REG   #符号化率
+    N_0 = E_s * R * 10 ** (- SNRdB / 10)    #雑音N_0
     noise = np.random.normal(0, np.sqrt(N_0 / 2), size) \
             + 1j * np.random.normal(0, np.sqrt(N_0/2), size)
     return noise
@@ -126,7 +119,7 @@ if __name__ == '__main__':
     print('# SNR BER:')
 
     # 伝送シミュレーション
-    for SNRdB in np.arange(0, 6.25, 0.25):
+    for SNRdB in np.arange(0, 6.25, 0.25):           #0, 6.25, 0.25
         # 送信データの生成
         tdata = np.random.randint(0, 2, (TEST, LENGTH - S_REG))
         
@@ -153,7 +146,9 @@ if __name__ == '__main__':
 
         # 伝送
         receive = transmit + awgn(SNRdB, (TEST, LT3))
-
+        #print(receive)
+        
+        
         # BPSK復調
         rcode[receive < 0] = 0
         rcode[receive >= 0] = 1
@@ -167,21 +162,25 @@ if __name__ == '__main__':
             n_cost_array[0, 0] = 0                          #最初の000のみ0で初期化
             p_origin_array = np.full((p_num, nodes_num), -1) #ノードにつながる矢印の根本を格納する配列
             p_bit_array = np.full((p_num, nodes_num), -1)    #ノードにつながる矢印のビット(0or1)を格納する配列
-            for layer in range(1, p_num):
+            for layer in range(1, p_num+1):
                 chead = (layer - 1) * S_REG
                 rcv_sig_ele = rcode[sig_num, chead:chead+S_REG]
                 for node_num in range(nodes_num):
                     node = nodes[node_num]
                     best_arrow = node.calc_min_cost(layer, n_cost_array, rcv_sig_ele)
                     n_cost_array[layer, node_num] = best_arrow.result
-                    p_origin_array = best_arrow.origin
-                    p_bit_array = best_arrow.input
+                    p_origin_array[layer-1, node_num] = best_arrow.origin
+                    p_bit_array[layer-1, node_num] = best_arrow.input
             #トレリス線図の結果生成に必要な初期化
             rlt_ptr = [p_num-1, 0]
-
+            for arr_num in range(p_num-1, -1, -1):
+                #print(tdata[sig_num, arr_num], p_bit_array[rlt_ptr[0], rlt_ptr[1]], tdata[sig_num, arr_num]==p_bit_array[rlt_ptr[0], rlt_ptr[1]])
+                rdata[sig_num, arr_num] = p_bit_array[rlt_ptr[0], rlt_ptr[1]]
+                rlt_ptr[1] = p_origin_array[rlt_ptr[0], rlt_ptr[1]]
+                rlt_ptr[0] -= 1
             
         # 誤り回数計算
-        rdata = tdata
+        #rdata = tdata
         ok = np.count_nonzero(rdata == tdata)
         error = rdata.size - ok
 
@@ -190,6 +189,7 @@ if __name__ == '__main__':
 
         # 結果表示
         print('SNR: {0:.2f}, BER: {1:.4e}'.format(SNRdB, BER))
+        #print(tdata==rdata)
 
         # CSV書き込み．コメントアウト解除すれば書き込める
         array.append([SNRdB, BER])
